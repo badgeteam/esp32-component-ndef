@@ -103,7 +103,8 @@ typedef struct {
 
 // Read an NDEF URI record.
 // The strings within are a reference to the blob passed.
-bool       ndef_uri_read(ndef_istream_t* istream, ndef_uri_t* uri_out);
+// Returns how long the record was read, or 0 on error.
+size_t     ndef_uri_read(ndef_istream_t* istream, ndef_uri_t* uri_out);
 // Make an NDEF URI from a string.
 ndef_uri_t ndef_uri_format(const char* uri, size_t uri_len);
 // Write an NDEF URI record.

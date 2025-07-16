@@ -9,11 +9,14 @@
 #include <stdint.h>
 
 // Return false if the expression is false.
-#define NDEF_RETURN_ON_FALSE(expr)   \
-    ({                               \
-        typeof(expr) expr_ = (expr); \
-        if (!(expr_)) return false;  \
-        expr_;                       \
+#define NDEF_RETURN_ON_FALSE(expr, ...) \
+    ({                                  \
+        typeof(expr) expr_ = (expr);    \
+        if (!(expr_)) {                 \
+            return false;               \
+            __VA_ARGS__                 \
+        }                               \
+        expr_;                          \
     })
 
 // A stream of output bytes with a length and capacity.
@@ -32,14 +35,14 @@ typedef struct {
 
 // NDEF type name format.
 typedef enum {
-    NDEF_TNF_EMPTY          = 0x00,  // Empty record
-    NDEF_TNF_NFC_WELL_KNOWN = 0x01,  // NFC well-known type
-    NDEF_TNF_MIME_MEDIA     = 0x02,  // MIME media type
-    NDEF_TNF_ABSOLUTE_URI   = 0x03,  // Absolute URI
-    NDEF_TNF_EXTERNAL_TYPE  = 0x04,  // External type
-    NDEF_TNF_UNKNOWN        = 0x05,  // Unknown type
-    NDEF_TNF_UNCHANGED      = 0x06,  // Unchanged type
-    NDEF_TNF_RESERVED       = 0x07,  // Reserved type
+    NDEF_TNF_EMPTY         = 0x00,  // Empty record
+    NDEF_TNF_WELL_KNOWN    = 0x01,  // NFC well-known type
+    NDEF_TNF_MIME_MEDIA    = 0x02,  // MIME media type
+    NDEF_TNF_ABSOLUTE_URI  = 0x03,  // Absolute URI
+    NDEF_TNF_EXTERNAL_TYPE = 0x04,  // External type
+    NDEF_TNF_UNKNOWN       = 0x05,  // Unknown type
+    NDEF_TNF_UNCHANGED     = 0x06,  // Unchanged type
+    NDEF_TNF_RESERVED      = 0x07,  // Reserved type
 } ndef_tnf_t;
 
 // Create an input stream from some bytes.
@@ -69,10 +72,12 @@ typedef enum {
     NDEF_POS_MIDDLE    = 0x00,
 } ndef_pos_t;
 
-// A decoded NDEF well-known message.
+// A decoded NDEF record.
 typedef struct {
     // Whether this is beginning, end, both or middle of a message.
     ndef_pos_t     pos;
+    // Type name format.
+    ndef_tnf_t     tnf;
     // Length of type.
     size_t         type_len;
     // Type string.
@@ -81,7 +86,7 @@ typedef struct {
     size_t         payload_len;
     // Payload data.
     const uint8_t* payload;
-} ndef_well_known_t;
+} ndef_record_t;
 
 // Reserve additional capacity.
 bool ndef_ostream_reserve(ndef_ostream_t* arr, size_t min_cap);
@@ -95,7 +100,8 @@ static inline size_t ndef_istream_available(const ndef_istream_t* stream) {
     return stream->len - stream->index;
 }
 
-// Try to write a well-known NDEF record without its payload.
-bool ndef_write_well_known(ndef_ostream_t* data_out, const char* type, ndef_pos_t pos, size_t payload_len);
-// Try to read a well-known NDEF URI record.
-bool ndef_read_well_known(ndef_istream_t* istream, ndef_well_known_t* well_known_out);
+// Try to write an NDEF record without its payload.
+bool ndef_write_record(ndef_ostream_t* data_out, ndef_tnf_t tnf, const char* type, ndef_pos_t pos, size_t payload_len);
+// Try to read an NDEF record.
+// Returns how long the record was read, or 0 on error.
+size_t ndef_read_record(ndef_istream_t* istream, ndef_record_t* well_known_out);

@@ -57,10 +57,10 @@ bool ndef_ostream_extend(ndef_ostream_t* arr, uint8_t* value, size_t value_len) 
     return true;
 }
 
-// Try to write a well-known NDEF record without its payload.
-bool ndef_write_well_known(ndef_ostream_t* data_out, const char* type, ndef_pos_t pos, size_t payload_len) {
+// Try to write an NDEF record without its payload.
+bool ndef_write_record(ndef_ostream_t* data_out, ndef_tnf_t tnf, const char* type, ndef_pos_t pos, size_t payload_len) {
     bool    is_short = payload_len < 256;
-    uint8_t flags    = pos + is_short * NDEF_FLAG_SHORT_RECORD;
+    uint8_t flags    = pos + is_short * NDEF_FLAG_SHORT_RECORD + tnf;
     NDEF_RETURN_ON_FALSE(ndef_ostream_push(data_out, flags));
     size_t type_len = type ? strlen(type) : 0;
     NDEF_RETURN_ON_FALSE(ndef_ostream_push(data_out, type_len));
@@ -79,29 +79,31 @@ bool ndef_write_well_known(ndef_ostream_t* data_out, const char* type, ndef_pos_
     return true;
 }
 
-// Try to read a well-known NDEF URI record.
-bool ndef_read_well_known(ndef_istream_t* istream, ndef_well_known_t* well_known_out) {
+// Try to read an NDEF record.
+// Returns how long the record was read, or 0 on error.
+size_t ndef_read_record(ndef_istream_t* istream, ndef_record_t* well_known_out) {
     NDEF_RETURN_ON_FALSE(ndef_istream_available(istream) >= 3);
-    uint8_t flags            = istream->data[istream->index++];
+    size_t  index            = istream->index;
+    uint8_t flags            = istream->data[index++];
     well_known_out->pos      = flags & (NDEF_FLAG_MESSAGE_BEGIN | NDEF_FLAG_MESSAGE_END);
-    well_known_out->type_len = istream->data[istream->index++];
+    well_known_out->type_len = istream->data[index++];
     bool is_short            = flags & NDEF_FLAG_SHORT_RECORD;
     if (is_short) {
         NDEF_RETURN_ON_FALSE(ndef_istream_available(istream) >= 1);
-        well_known_out->payload_len = istream->data[istream->index++];
+        well_known_out->payload_len = istream->data[index++];
     } else {
         NDEF_RETURN_ON_FALSE(ndef_istream_available(istream) >= 4);
         uint32_t tmp  = 0;
-        tmp          |= (uint32_t)istream->data[istream->index++] << 24;
-        tmp          |= (uint32_t)istream->data[istream->index++] << 16;
-        tmp          |= (uint32_t)istream->data[istream->index++] << 8;
-        tmp          |= (uint32_t)istream->data[istream->index++];
+        tmp          |= (uint32_t)istream->data[index++] << 24;
+        tmp          |= (uint32_t)istream->data[index++] << 16;
+        tmp          |= (uint32_t)istream->data[index++] << 8;
+        tmp          |= (uint32_t)istream->data[index++];
 
         well_known_out->payload_len = tmp;
     }
     NDEF_RETURN_ON_FALSE(ndef_istream_available(istream) >= well_known_out->type_len + well_known_out->payload_len);
-    well_known_out->type     = (const char*)(istream->data + istream->index);
-    istream->index          += well_known_out->type_len;
-    well_known_out->payload  = istream->data + istream->index;
-    return true;
+    well_known_out->type     = (const char*)(istream->data + index);
+    index                   += well_known_out->type_len;
+    well_known_out->payload  = istream->data + index;
+    return index - istream->index + well_known_out->payload_len;
 }

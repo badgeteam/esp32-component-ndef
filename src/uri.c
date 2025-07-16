@@ -45,16 +45,17 @@ const char* const ndef_uri_prefixes[] = {
 
 // Read an NDEF URI record.
 // The strings within are a reference to the blob passed.
-bool ndef_uri_read(ndef_istream_t* istream, ndef_uri_t* uri_out) {
-    ndef_well_known_t well_known;
-    NDEF_RETURN_ON_FALSE(ndef_read_well_known(istream, &well_known));
+// Returns how long the record was read, or 0 on error.
+size_t ndef_uri_read(ndef_istream_t* istream, ndef_uri_t* uri_out) {
+    ndef_record_t well_known;
+    size_t        record_len = NDEF_RETURN_ON_FALSE(ndef_read_record(istream, &well_known));
     NDEF_RETURN_ON_FALSE(well_known.type_len == 1 && well_known.type[0] == 'U');
     uri_out->prefix = istream->data[istream->index++];
     NDEF_RETURN_ON_FALSE(uri_out->prefix < NDEF_URI_NUM_PREFIX);
     uri_out->uri     = (const char*)(well_known.payload + 1);
     uri_out->uri_len = well_known.payload_len - 1;
     uri_out->pos     = well_known.pos;
-    return true;
+    return record_len;
 }
 
 // Make an NDEF URI from a string.
@@ -80,7 +81,7 @@ ndef_uri_t ndef_uri_format(const char* uri, size_t uri_len) {
 
 // Write an NDEF URI record.
 bool ndef_uri_write(ndef_ostream_t* data_out, ndef_uri_t uri, ndef_pos_t pos) {
-    NDEF_RETURN_ON_FALSE(ndef_write_well_known(data_out, "U", pos, uri.uri_len + 1));
+    NDEF_RETURN_ON_FALSE(ndef_write_record(data_out, NDEF_TNF_WELL_KNOWN, "U", pos, uri.uri_len + 1));
     NDEF_RETURN_ON_FALSE(ndef_ostream_push(data_out, uri.prefix));
     NDEF_RETURN_ON_FALSE(ndef_ostream_extend(data_out, (uint8_t*)uri.uri, uri.uri_len));
     return true;
